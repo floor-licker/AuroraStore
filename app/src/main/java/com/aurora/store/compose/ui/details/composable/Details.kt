@@ -55,7 +55,7 @@ import com.aurora.store.util.PackageUtil
 fun Details(
     app: App,
     state: AppState = AppState.Unavailable,
-    onNavigateToDetailsDevProfile: (developerName: String) -> Unit = {}
+    onNavigateToDetailsDevProfile: ((developerName: String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val versionName = if (state is AppState.Installed) state.versionName else app.versionName
@@ -125,13 +125,18 @@ fun Details(
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                modifier = Modifier
-                    .clickable(onClick = { onNavigateToDetailsDevProfile(app.developerName) }),
+                modifier = onNavigateToDetailsDevProfile?.let { onNavigate ->
+                    Modifier.clickable { onNavigate(app.developerName) }
+                } ?: Modifier,
                 text = app.developerName,
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.primary
+                color = if (onNavigateToDetailsDevProfile != null) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
             )
             AnimatedContent(targetState = state::class) { cState ->
                 if (cState == AppState.Updatable::class) {

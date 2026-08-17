@@ -57,14 +57,11 @@ fun MoreSheet(
     viewModel: MoreViewModel = hiltViewModel()
 ) {
     val mainItems = listOf(
-        MoreItem(R.string.title_apps_games, R.drawable.ic_apps) {
+        MoreItem(R.string.title_installed, R.drawable.ic_apps) {
             onNavigateTo(Destination.Installed)
         },
         MoreItem(R.string.title_blacklist_manager, R.drawable.ic_blacklist) {
             onNavigateTo(Destination.Blacklist)
-        },
-        MoreItem(R.string.title_favourites_manager, R.drawable.ic_favorite_unchecked) {
-            onNavigateTo(Destination.Favourite)
         },
         MoreItem(R.string.title_spoof_manager, R.drawable.ic_spoof) {
             onNavigateTo(Destination.Spoof)

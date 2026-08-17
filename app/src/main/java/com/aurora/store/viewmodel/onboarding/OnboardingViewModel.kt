@@ -60,7 +60,9 @@ class OnboardingViewModel @Inject constructor(
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
-    val isMicroGPromptRequired = FlavouredUtil.promptMicroGInstall(context)
+    // Installing a missing microG bundle would be a first-time app installation, which this
+    // update-only build deliberately does not offer.
+    val isMicroGPromptRequired = false
 
     var uiState by mutableStateOf(OnboardingUiState())
         private set

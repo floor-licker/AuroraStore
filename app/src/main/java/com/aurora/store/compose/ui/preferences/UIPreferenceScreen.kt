@@ -38,9 +38,7 @@ import com.aurora.store.compose.composable.TopAppBar
 import com.aurora.store.compose.preview.ThemePreviewProvider
 import com.aurora.store.compose.ui.preferences.network.SingleChoiceDialog
 import com.aurora.store.util.Preferences
-import com.aurora.store.util.Preferences.PREFERENCE_DEFAULT_SELECTED_TAB
 import com.aurora.store.util.Preferences.PREFERENCE_DYNAMIC_COLORS
-import com.aurora.store.util.Preferences.PREFERENCE_FOR_YOU
 import com.aurora.store.util.Preferences.PREFERENCE_THEME_STYLE
 import com.aurora.store.util.save
 
@@ -57,13 +55,6 @@ private fun ScreenContent() {
     var themeStyle by remember {
         mutableIntStateOf(Preferences.getInteger(context, PREFERENCE_THEME_STYLE))
     }
-    val tabEntries = stringArrayResource(R.array.pref_default_tab)
-    var selectedTab by remember {
-        mutableIntStateOf(Preferences.getInteger(context, PREFERENCE_DEFAULT_SELECTED_TAB))
-    }
-    var forYou by remember {
-        mutableStateOf(Preferences.getBoolean(context, PREFERENCE_FOR_YOU, true))
-    }
     var dynamicColors by remember {
         mutableStateOf(
             Preferences.getBoolean(
@@ -74,7 +65,6 @@ private fun ScreenContent() {
         )
     }
     var showThemeDialog by remember { mutableStateOf(false) }
-    var showTabDialog by remember { mutableStateOf(false) }
 
     if (showThemeDialog) {
         SingleChoiceDialog(
@@ -88,20 +78,6 @@ private fun ScreenContent() {
                 showThemeDialog = false
             },
             onDismiss = { showThemeDialog = false }
-        )
-    }
-
-    if (showTabDialog) {
-        SingleChoiceDialog(
-            title = stringResource(R.string.pref_ui_layout_tab),
-            options = tabEntries.toList(),
-            selected = selectedTab,
-            onSelect = { index ->
-                selectedTab = index
-                context.save(PREFERENCE_DEFAULT_SELECTED_TAB, index)
-                showTabDialog = false
-            },
-            onDismiss = { showTabDialog = false }
         )
     }
 
@@ -165,40 +141,6 @@ private fun ScreenContent() {
                         }
                     )
                 }
-            }
-            item { HorizontalDivider() }
-            item {
-                ListItem(headlineContent = { Text(stringResource(R.string.pref_ui_layout)) })
-            }
-            item {
-                ListItem(
-                    modifier = Modifier.clickable { showTabDialog = true },
-                    headlineContent = { Text(stringResource(R.string.pref_ui_layout_tab)) },
-                    supportingContent = { Text(tabEntries.getOrElse(selectedTab) { "" }) }
-                )
-            }
-            item { HorizontalDivider() }
-            item {
-                ListItem(headlineContent = { Text(stringResource(R.string.pref_common_extra)) })
-            }
-            item {
-                ListItem(
-                    modifier = Modifier.clickable {
-                        forYou = !forYou
-                        context.save(PREFERENCE_FOR_YOU, forYou)
-                    },
-                    headlineContent = { Text(stringResource(R.string.pref_ui_no_for_you)) },
-                    supportingContent = { Text(stringResource(R.string.pref_ui_no_for_you_desc)) },
-                    trailingContent = {
-                        Switch(
-                            checked = forYou,
-                            onCheckedChange = { checked ->
-                                forYou = checked
-                                context.save(PREFERENCE_FOR_YOU, checked)
-                            }
-                        )
-                    }
-                )
             }
         }
     }

@@ -40,6 +40,7 @@ class AMInstaller @Inject constructor(
     }
 
     override fun install(download: Download) {
+        super.install(download)
         if (isAlreadyQueued(download.packageName)) {
             Log.i(TAG, "${download.packageName} already queued")
         } else {

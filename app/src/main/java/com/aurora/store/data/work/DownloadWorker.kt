@@ -51,6 +51,7 @@ import com.aurora.store.util.PackageUtil
 import com.aurora.store.util.PathUtil
 import com.aurora.store.util.Preferences
 import com.aurora.store.util.Preferences.PREFERENCE_NOTIFICATION_PROGRESS
+import com.aurora.store.util.UpdateOnlyPolicy
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.io.File
@@ -135,6 +136,11 @@ class DownloadWorker @AssistedInject constructor(
         // Fetch required data for download
         try {
             download = downloadDao.getDownload(inputData.getString(DownloadHelper.PACKAGE_NAME)!!)
+            if (!isUpgradeAllowed()) {
+                Log.w(TAG, "Rejecting non-upgrade download for ${download.packageName}")
+                downloadDao.updateStatus(download.packageName, DownloadStatus.CANCELLED)
+                return Result.failure()
+            }
             purchaseHelper = resolvePurchaseHelper(download.packageName)
         } catch (exception: Exception) {
             return onFailure(exception)
@@ -272,6 +278,14 @@ class DownloadWorker @AssistedInject constructor(
 
     private suspend fun onSuccess(): Result {
         return withContext(NonCancellable) {
+            // The package may have been removed or updated by another installer while its APKs
+            // were downloading. Re-check immediately before handing files to an installer.
+            if (!isUpgradeAllowed()) {
+                Log.w(TAG, "Rejecting stale install for ${download.packageName}")
+                notifyStatus(DownloadStatus.CANCELLED)
+                return@withContext Result.failure()
+            }
+
             return@withContext try {
                 // Update the ongoing foreground notification to reflect the install phase,
                 // so the user sees a clean "Downloading -> Installing" progression instead of
@@ -285,6 +299,12 @@ class DownloadWorker @AssistedInject constructor(
             }
         }
     }
+
+    private fun isUpgradeAllowed(): Boolean = UpdateOnlyPolicy.canAcquireUpgrade(
+        context,
+        download.packageName,
+        download.versionCode
+    )
 
     /**
      * Whether the current stop/cancellation was initiated by the user (or the app on the

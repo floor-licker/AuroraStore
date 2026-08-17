@@ -34,6 +34,7 @@ import com.aurora.store.util.NotificationUtil
 import com.aurora.store.util.PathUtil
 import com.aurora.store.util.Preferences
 import com.aurora.store.util.Preferences.PREFERENCE_AUTO_DELETE
+import com.aurora.store.util.UpdateOnlyPolicy
 import java.io.File
 
 abstract class InstallerBase(private val context: Context) : IInstaller {
@@ -76,6 +77,10 @@ abstract class InstallerBase(private val context: Context) : IInstaller {
         private set
 
     override fun install(download: Download) {
+        // Final enforcement boundary: every installer must reject first-time installs,
+        // downgrades and same-version reinstalls even if a stale notification or queued worker
+        // bypassed the visible UI and download queue checks.
+        UpdateOnlyPolicy.requireUpgrade(context, download.packageName, download.versionCode)
         this.download = download
     }
 

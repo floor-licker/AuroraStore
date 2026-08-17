@@ -7,7 +7,6 @@
 package com.aurora.store.compose.navigation
 
 import android.content.Intent
-import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.VisibilityThreshold
 import androidx.compose.animation.core.spring
@@ -15,7 +14,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -26,7 +24,6 @@ import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
-import androidx.navigation3.runtime.metadata
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
@@ -39,15 +36,10 @@ import com.aurora.store.compose.ui.about.AboutScreen
 import com.aurora.store.compose.ui.accounts.AccountsScreen
 import com.aurora.store.compose.ui.accounts.GoogleLoginScreen
 import com.aurora.store.compose.ui.blacklist.BlacklistScreen
-import com.aurora.store.compose.ui.commons.CategoryBrowseScreen
-import com.aurora.store.compose.ui.commons.ExpandedStreamBrowseScreen
 import com.aurora.store.compose.ui.commons.PermissionRationaleScreen
-import com.aurora.store.compose.ui.commons.StreamBrowseScreen
 import com.aurora.store.compose.ui.details.AppDetailsScreen
-import com.aurora.store.compose.ui.dev.DevProfileScreen
 import com.aurora.store.compose.ui.dispenser.DispenserScreen
 import com.aurora.store.compose.ui.downloads.DownloadsScreen
-import com.aurora.store.compose.ui.favourite.FavouriteScreen
 import com.aurora.store.compose.ui.installed.InstalledScreen
 import com.aurora.store.compose.ui.main.MainScreen
 import com.aurora.store.compose.ui.onboarding.OnboardingScreen
@@ -60,7 +52,6 @@ import com.aurora.store.compose.ui.preferences.network.NetworkPreferenceScreen
 import com.aurora.store.compose.ui.preferences.security.SecurityPreferenceScreen
 import com.aurora.store.compose.ui.preferences.updates.SourceFiltersScreen
 import com.aurora.store.compose.ui.preferences.updates.UpdatesPreferenceScreen
-import com.aurora.store.compose.ui.search.SearchScreen
 import com.aurora.store.compose.ui.splash.SplashScreen
 import com.aurora.store.compose.ui.spoof.SpoofScreen
 import com.aurora.store.data.event.AuthEvent
@@ -70,6 +61,7 @@ import com.aurora.store.data.providers.AccountProvider
 import com.aurora.store.data.providers.AuthProvider
 import com.aurora.store.util.PackageUtil
 import com.aurora.store.util.Preferences
+import com.aurora.store.util.UpdateOnlyPolicy
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
@@ -169,29 +161,30 @@ fun NavDisplay(startDestination: NavKey) {
                 backstack.add(Screen.Main(destination.initialTab))
             }
 
-            is Destination.ExpandedStreamBrowse -> backstack.add(
-                Screen.ExpandedStreamBrowse(destination.title, destination.browseUrl)
-            )
-
-            is Destination.CategoryBrowse -> backstack.add(
-                Screen.CategoryBrowse(destination.category.title, destination.category.browseUrl)
-            )
+            is Destination.ExpandedStreamBrowse,
+            is Destination.CategoryBrowse,
+            is Destination.DevProfile,
+            is Destination.StreamBrowse,
+            Destination.Search,
+            Destination.Favourite -> context.toast(R.string.update_only_browsing_disabled)
 
             is Destination.PermissionRationale -> backstack.add(
                 Screen.PermissionRationale(destination.permissions)
             )
 
-            is Destination.AppDetails -> backstack.add(Screen.AppDetails(destination.packageName))
-            is Destination.DevProfile -> backstack.add(Screen.DevProfile(destination.devId))
+            is Destination.AppDetails -> {
+                if (UpdateOnlyPolicy.canViewApp(context, destination.packageName)) {
+                    backstack.add(Screen.AppDetails(destination.packageName))
+                } else {
+                    context.toast(R.string.update_only_installed_apps_only)
+                }
+            }
             is Destination.AppUpdate -> Unit
-            is Destination.StreamBrowse -> backstack.add(Screen.StreamBrowse(destination.cluster))
             is Destination.GoogleLogin -> backstack.add(Screen.GoogleLogin(destination.addAccount))
 
-            Destination.Search -> backstack.add(Screen.Search)
             Destination.Downloads -> backstack.add(Screen.Downloads)
             Destination.Accounts -> backstack.add(Screen.Accounts)
             Destination.About -> backstack.add(Screen.About)
-            Destination.Favourite -> backstack.add(Screen.Favourite)
             Destination.Spoof -> backstack.add(Screen.Spoof)
             Destination.Installed -> backstack.add(Screen.Installed)
             Destination.Blacklist -> backstack.add(Screen.Blacklist)
@@ -206,6 +199,18 @@ fun NavDisplay(startDestination: NavKey) {
             Destination.SourceFilters -> backstack.add(Screen.SourceFilters)
             Destination.SecurityPreference -> backstack.add(Screen.SecurityPreference)
         }
+    }
+
+    fun rejectRestoredBrowsingRoute() {
+        context.toast(R.string.update_only_browsing_disabled)
+        backstack.clear()
+        backstack.add(Screen.Main())
+    }
+
+    fun rejectRestoredAppDetailsRoute() {
+        context.toast(R.string.update_only_installed_apps_only)
+        backstack.clear()
+        backstack.add(Screen.Main())
     }
 
     NavDisplay(
@@ -236,25 +241,16 @@ fun NavDisplay(startDestination: NavKey) {
             }
 
             entry<Screen.AppDetails> { screen ->
-                AppDetailsScreen(
-                    packageName = screen.packageName,
-                    onNavigateTo = ::navigate
-                )
+                if (UpdateOnlyPolicy.canViewApp(context, screen.packageName)) {
+                    AppDetailsScreen(packageName = screen.packageName)
+                } else {
+                    RejectedRoute(::rejectRestoredAppDetailsRoute)
+                }
             }
 
-            entry<Screen.DevProfile> { screen ->
-                DevProfileScreen(
-                    developerId = screen.developerId,
-                    onNavigateTo = ::navigate
-                )
-            }
+            entry<Screen.DevProfile> { RejectedRoute(::rejectRestoredBrowsingRoute) }
 
-            entry<Screen.PublisherProfile> { screen ->
-                DevProfileScreen(
-                    publisherId = screen.publisherId,
-                    onNavigateTo = ::navigate
-                )
-            }
+            entry<Screen.PublisherProfile> { RejectedRoute(::rejectRestoredBrowsingRoute) }
 
             entry<Screen.PermissionRationale> { screen ->
                 PermissionRationaleScreen(
@@ -262,49 +258,17 @@ fun NavDisplay(startDestination: NavKey) {
                 )
             }
 
-            entry<Screen.StreamBrowse> { screen ->
-                StreamBrowseScreen(
-                    streamCluster = screen.streamCluster,
-                    onNavigateTo = ::navigate
-                )
-            }
+            entry<Screen.StreamBrowse> { RejectedRoute(::rejectRestoredBrowsingRoute) }
 
-            entry<Screen.ExpandedStreamBrowse> { screen ->
-                ExpandedStreamBrowseScreen(
-                    browseUrl = screen.browseUrl,
-                    defaultTitle = screen.title,
-                    onNavigateTo = ::navigate
-                )
-            }
+            entry<Screen.ExpandedStreamBrowse> { RejectedRoute(::rejectRestoredBrowsingRoute) }
 
-            entry<Screen.CategoryBrowse> { screen ->
-                CategoryBrowseScreen(
-                    title = screen.title,
-                    browseUrl = screen.browseUrl,
-                    onNavigateTo = ::navigate
-                )
-            }
+            entry<Screen.CategoryBrowse> { RejectedRoute(::rejectRestoredBrowsingRoute) }
 
             entry<Screen.InstallationPreference> {
                 InstallationPreferenceScreen(onNavigateTo = ::navigate)
             }
 
-            entry<Screen.Search>(
-                metadata = metadata {
-                    put(NavDisplay.TransitionKey) {
-                        fadeIn(navFadeSpec) togetherWith
-                            ExitTransition.KeepUntilTransitionsFinished
-                    }
-                    put(NavDisplay.PopTransitionKey) {
-                        fadeIn(navFadeSpec) togetherWith
-                            slideOutVertically(navSlideSpec) { it }
-                    }
-                    put(NavDisplay.PredictivePopTransitionKey) {
-                        fadeIn(navFadeSpec) togetherWith
-                            slideOutVertically(navSlideSpec) { it }
-                    }
-                }
-            ) { SearchScreen() }
+            entry<Screen.Search> { RejectedRoute(::rejectRestoredBrowsingRoute) }
 
             entry<Screen.Splash> { screen ->
                 SplashScreen(
@@ -325,7 +289,7 @@ fun NavDisplay(startDestination: NavKey) {
             entry<Screen.Downloads> { DownloadsScreen(onNavigateTo = ::navigate) }
             entry<Screen.Accounts> { AccountsScreen(onNavigateTo = ::navigate) }
             entry<Screen.About> { AboutScreen() }
-            entry<Screen.Favourite> { FavouriteScreen(onNavigateTo = ::navigate) }
+            entry<Screen.Favourite> { RejectedRoute(::rejectRestoredBrowsingRoute) }
             entry<Screen.Spoof> { SpoofScreen(onNavigateTo = ::navigate) }
             entry<Screen.Dispenser> { DispenserScreen() }
             entry<Screen.Installer> { InstallerScreen() }
@@ -339,4 +303,10 @@ fun NavDisplay(startDestination: NavKey) {
             entry<Screen.SecurityPreference> { SecurityPreferenceScreen() }
         }
     )
+}
+
+/** Empty transition target used only while a legacy browsing route is being discarded. */
+@Composable
+private fun RejectedRoute(onReject: () -> Unit) {
+    LaunchedEffect(Unit) { onReject() }
 }

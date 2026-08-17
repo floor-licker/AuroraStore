@@ -10,11 +10,8 @@ import android.util.Base64
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -46,40 +43,23 @@ import com.aurora.store.compose.composable.Info
 import com.aurora.store.compose.composable.ScrollHint
 import com.aurora.store.compose.composable.SectionHeader
 import com.aurora.store.compose.composable.TopAppBar
-import com.aurora.store.compose.composable.app.AppListItem
-import com.aurora.store.compose.navigation.Destination
 import com.aurora.store.compose.preview.AppPreviewProvider
 import com.aurora.store.compose.preview.ThemePreviewProvider
 import com.aurora.store.viewmodel.details.AppDetailsViewModel
-import com.aurora.store.viewmodel.details.MoreViewModel
 
 @Composable
 fun MoreScreen(
     packageName: String,
-    onNavigateTo: (Destination) -> Unit,
-    appDetailsViewModel: AppDetailsViewModel = hiltViewModel(key = packageName),
-    moreViewModel: MoreViewModel = hiltViewModel(
-        key = "$packageName/more",
-        creationCallback = { factory: MoreViewModel.Factory ->
-            factory.create(appDetailsViewModel.app.value!!.dependencies.dependentPackages)
-        }
-    )
+    appDetailsViewModel: AppDetailsViewModel = hiltViewModel(key = packageName)
 ) {
     val app by appDetailsViewModel.app.collectAsStateWithLifecycle()
-    val dependencies by moreViewModel.dependentApps.collectAsStateWithLifecycle()
 
-    ScreenContent(
-        app = app!!,
-        dependencies = dependencies,
-        onNavigateTo = onNavigateTo
-    )
+    ScreenContent(app = app!!)
 }
 
 @Composable
 private fun ScreenContent(
     app: App,
-    dependencies: List<App>? = null,
-    onNavigateTo: (Destination) -> Unit = {},
     windowAdaptiveInfo: WindowAdaptiveInfo = currentWindowAdaptiveInfoV2()
 ) {
     val topAppBarTitle = when {
@@ -125,15 +105,6 @@ private fun ScreenContent(
                 }
 
                 item {
-                    if (dependencies != null) {
-                        AppDependencies(
-                            dependencies = dependencies,
-                            onNavigateTo = onNavigateTo
-                        )
-                    }
-                }
-
-                item {
                     AppInfoMore(app = app)
                 }
             }
@@ -141,28 +112,6 @@ private fun ScreenContent(
                 listState = listState,
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
-        }
-    }
-}
-
-/**
- * Composable to show dependencies of an app
- */
-@Composable
-private fun AppDependencies(dependencies: List<App>, onNavigateTo: (Destination) -> Unit) {
-    SectionHeader(title = stringResource(R.string.details_dependencies))
-    if (dependencies.isEmpty()) {
-        Info(
-            title = AnnotatedString(text = stringResource(R.string.details_no_dependencies))
-        )
-    } else {
-        LazyRow(modifier = Modifier.fillMaxWidth()) {
-            items(items = dependencies, key = { item -> item.id }) { app ->
-                AppListItem(
-                    app = app,
-                    onClick = { onNavigateTo(Destination.AppDetails(app.packageName)) }
-                )
-            }
         }
     }
 }

@@ -42,6 +42,7 @@ import com.aurora.store.data.receiver.MigrationReceiver
 import com.aurora.store.util.AppLockAuthenticator
 import com.aurora.store.util.PackageUtil
 import com.aurora.store.util.Preferences
+import com.aurora.store.util.UpdateOnlyPolicy
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -151,15 +152,43 @@ class ComposeActivity : FragmentActivity() {
     }
 
     private fun resolveStartDestination(): Screen {
-        // Parcel-based navigation (e.g. from NotificationUtil or DeepLinkConfirmActivity, which
-        // owns the external ACTION_VIEW market:// and play.google.com deep links)
+        // Parcel-based navigation (for example, from update notifications).
         IntentCompat.getParcelableExtra(intent, Screen.PARCEL_KEY, Screen::class.java)
-            ?.let { return it }
+            ?.let { return sanitizeStartDestination(it) }
 
-        // SEND / SHOW_APP_INFO — getPackageName() handles both
-        intent.getPackageName()?.let { return Screen.AppDetails(it) }
+        // SHOW_APP_INFO — getPackageName() handles the package extra.
+        intent.getPackageName()?.let { packageName ->
+            if (UpdateOnlyPolicy.canViewApp(this, packageName)) {
+                return Screen.AppDetails(packageName)
+            }
+        }
 
         return defaultStart()
+    }
+
+    /** Prevent exported intents and stale saved routes from reopening a discovery surface. */
+    private fun sanitizeStartDestination(screen: Screen): Screen = when (screen) {
+        is Screen.AppDetails -> if (UpdateOnlyPolicy.canViewApp(this, screen.packageName)) {
+            screen
+        } else {
+            defaultStart()
+        }
+
+        is Screen.Splash -> screen.copy(
+            packageName = screen.packageName?.takeIf {
+                UpdateOnlyPolicy.canViewApp(this, it)
+            }
+        )
+
+        is Screen.DevProfile,
+        is Screen.PublisherProfile,
+        is Screen.StreamBrowse,
+        is Screen.ExpandedStreamBrowse,
+        is Screen.CategoryBrowse,
+        Screen.Search,
+        Screen.Favourite -> defaultStart()
+
+        else -> screen
     }
 
     private fun defaultStart(): Screen = when {

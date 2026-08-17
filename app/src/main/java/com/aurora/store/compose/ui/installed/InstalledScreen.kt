@@ -96,7 +96,7 @@ private fun ScreenContent(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = stringResource(R.string.title_apps_games),
+                title = stringResource(R.string.title_installed),
                 actions = {
                     IconButton(onClick = { sheetVisible = true }) {
                         Icon(

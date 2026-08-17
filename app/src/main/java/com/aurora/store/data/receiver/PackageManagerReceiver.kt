@@ -24,15 +24,20 @@ import android.content.Context
 import android.content.Intent
 import com.aurora.store.AuroraApp
 import com.aurora.store.data.event.InstallerEvent
+import com.aurora.store.data.helper.DownloadHelper
 import com.aurora.store.data.installer.AppInstaller
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 open class PackageManagerReceiver : BroadcastReceiver() {
 
     @Inject
     lateinit var appInstaller: AppInstaller
+
+    @Inject
+    lateinit var downloadHelper: DownloadHelper
 
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != null && intent.data != null) {
@@ -45,6 +50,11 @@ open class PackageManagerReceiver : BroadcastReceiver() {
 
                 Intent.ACTION_PACKAGE_REMOVED -> {
                     AuroraApp.events.send(InstallerEvent.Uninstalled(packageName))
+                    if (!intent.getBooleanExtra(Intent.EXTRA_REPLACING, false)) {
+                        // Once the target package is gone, continuing would turn the queued
+                        // upgrade into a first-time installation attempt.
+                        AuroraApp.scope.launch { downloadHelper.cancelDownload(packageName) }
+                    }
                 }
             }
 

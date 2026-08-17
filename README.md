@@ -1,12 +1,21 @@
 # Aurora Store
 
-Aurora Store enables you to search and download apps from the official Google Play store. You can check app descriptions, screenshots, updates, reviews, and download the APK directly from Google Play to your device. 
+> [!IMPORTANT]
+> This fork is an **update-only build** intended for preinstallation on LineageOS. It can check
+> for and install newer versions of apps already present on the device. Catalogue browsing,
+> search, external store links, first-time app installation, manual version downloads, and
+> downgrades are disabled.
 
-To use Aurora Store, log in using Google Play account, when you first open and configure Aurora Store.
+The restriction is enforced in both the user interface and the download/install pipeline. Hiding
+the catalogue is not the security boundary: deep links, inherited download queues, background
+workers, download-history retries, and every installer implementation also validate that the
+target package is installed and that the requested version is an upgrade.
 
-Unlike a traditional app store, Aurora Store does not own, license or distribute any apps. All apps, app descriptions, screenshots and other content in Aurora Store are directly accessed, downloaded and/or displayed from Google Play. 
+This build uses Aurora Store's Google Play client to resolve updates for installed packages. To
+use it, sign in with a Google account or an anonymous Aurora session during initial setup.
 
-Aurora Store works exactly like a door or a browser, allowing you to log in to your Google Play account and find the apps from Google Play. 
+Aurora Store does not own, license, or distribute apps. App metadata and files are accessed
+directly from Google Play solely when checking or applying an eligible update.
 
 *_Please note that Aurora Store does not have any approval, sponsorship or authorization from Google, Google Play, any apps downloaded through Aurora Store or any app developers; neither does Aurora Store have any affiliation, cooperation or connection with them._*
 
@@ -18,14 +27,15 @@ Aurora Store works exactly like a door or a browser, allowing you to log in to y
 - FOSS: Has GPLv3 licence
 - Beautiful design: Built upon latest Material 3 guidelines
 - Account login: You can login with either personal or an anonymous account
-- Device & Locale spoofing: Change your device and/or locale to access geo locked apps
-- [Exodus Privacy](https://exodus-privacy.eu.org/) integration: Instantly see trackers in app
-- [Plexus](https://plexus.techlore.tech/) integration: Instantly see app compatibility without Google Play Services or with microG
+- Update checks for packages already installed on the device
+- Manual and automatic installation of eligible upgrades
 - Updates blacklisting: Ignore updates for specific apps
-- Download manager
-- Manual downloads: allows you to download older version of apps, provided
-  - The APKs are available with Google
-  - You know the version codes for older versions 
+- Download manager for update jobs
+- Device and locale spoofing for update compatibility
+- [Exodus Privacy](https://exodus-privacy.eu.org/) integration for tracker changes in updates
+
+This fork deliberately does not include catalogue browsing, search, favourites, new app installs,
+app unarchiving, manual version downloads, or downgrades.
 
 ## Limitations
 

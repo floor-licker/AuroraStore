@@ -24,6 +24,7 @@ import com.aurora.store.data.room.suite.ExternalApk
 import com.aurora.store.data.room.update.Update
 import com.aurora.store.data.work.DownloadWorker
 import com.aurora.store.util.PathUtil
+import com.aurora.store.util.UpdateOnlyPolicy
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -76,8 +77,10 @@ class DownloadHelper @Inject constructor(
     fun init() {
         AuroraApp.scope.launch {
             val downloads = downloadDao.downloads().firstOrNull() ?: emptyList()
-            cancelFailedDownloads(downloads)
             finalizeStaleSelfUpdate(downloads)
+            val refreshedDownloads = downloadDao.downloads().firstOrNull() ?: emptyList()
+            cancelFailedDownloads(refreshedDownloads)
+            cancelDisallowedDownloads(refreshedDownloads)
         }.invokeOnCompletion {
             observeDownloads()
             observeInstalls()
@@ -142,8 +145,23 @@ class DownloadHelper @Inject constructor(
                 if (list.none { it.status in DownloadStatus.processing }) {
                     list.find { it.status == DownloadStatus.QUEUED }
                         ?.let { queuedDownload ->
-                            Log.i(TAG, "Enqueued download worker for ${queuedDownload.packageName}")
-                            trigger(queuedDownload)
+                            if (isUpgradeAllowed(queuedDownload)) {
+                                Log.i(
+                                    TAG,
+                                    "Enqueued download worker for ${queuedDownload.packageName}"
+                                )
+                                trigger(queuedDownload)
+                            } else {
+                                Log.w(
+                                    TAG,
+                                    "Cancelling disallowed download for " +
+                                        queuedDownload.packageName
+                                )
+                                downloadDao.updateStatus(
+                                    queuedDownload.packageName,
+                                    DownloadStatus.CANCELLED
+                                )
+                            }
                         }
                 }
             } catch (exception: Exception) {
@@ -208,6 +226,15 @@ class DownloadHelper @Inject constructor(
      * gone, falls through and is (re)enqueued.
      */
     private suspend fun enqueue(download: Download) {
+        if (!isUpgradeAllowed(download)) {
+            Log.w(
+                TAG,
+                "Ignoring non-upgrade download request for ${download.packageName} " +
+                    "(${download.versionCode})"
+            )
+            return
+        }
+
         val existing = getDownload(download.packageName)
         if (existing != null && existing.versionCode == download.versionCode) {
             if (existing.canInstall(context)) {
@@ -236,6 +263,10 @@ class DownloadHelper @Inject constructor(
      */
     suspend fun retryDownload(packageName: String) {
         val existing = getDownload(packageName) ?: return
+        if (!isUpgradeAllowed(existing)) {
+            Log.w(TAG, "Ignoring non-upgrade retry request for $packageName")
+            return
+        }
         if (existing.isActive) {
             Log.i(TAG, "Skipping retry for $packageName; already ${existing.status}")
             return
@@ -326,6 +357,36 @@ class DownloadHelper @Inject constructor(
                 ?.run { downloadDao.updateStatus(it.packageName, DownloadStatus.FAILED) }
         }
     }
+
+    /**
+     * Cancels work inherited from a full Aurora Store installation when it would install a new
+     * package, a downgrade, or a version that is already present on the device.
+     */
+    private suspend fun cancelDisallowedDownloads(downloadList: List<Download>) {
+        val cancellableStatuses = DownloadStatus.processing + setOf(
+            DownloadStatus.QUEUED,
+            DownloadStatus.COMPLETED,
+            DownloadStatus.INSTALLING
+        )
+        downloadList
+            .filter { it.status in cancellableStatuses }
+            .filterNot(::isUpgradeAllowed)
+            .forEach { download ->
+                Log.w(TAG, "Cancelling inherited non-upgrade for ${download.packageName}")
+                WorkManager.getInstance(context)
+                    .cancelAllWorkByTag("$PACKAGE_NAME:${download.packageName}")
+                runCatching {
+                    appInstaller.getPreferredInstaller().cancelInstall(download.packageName)
+                }
+                downloadDao.updateStatus(download.packageName, DownloadStatus.CANCELLED)
+            }
+    }
+
+    private fun isUpgradeAllowed(download: Download): Boolean = UpdateOnlyPolicy.canAcquireUpgrade(
+        context,
+        download.packageName,
+        download.versionCode
+    )
 
     private fun trigger(download: Download) {
         val inputData = Data.Builder()

@@ -37,6 +37,7 @@ import com.aurora.store.R
 import com.aurora.store.compose.composable.app.AnimatedAppIcon
 import com.aurora.store.data.room.download.Download
 import com.aurora.store.util.PackageUtil
+import com.aurora.store.util.UpdateOnlyPolicy
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,7 +52,14 @@ fun DownloadActionsSheet(
 ) {
     val context = LocalContext.current
     val canInstall = download.canInstall(context)
-    val canExport = canInstall || PackageUtil.isInstalled(context, download.packageName)
+    val isInstalled = PackageUtil.isInstalled(context, download.packageName)
+    val canApplyUpdate = canInstall &&
+        UpdateOnlyPolicy.canAcquireUpgrade(
+            context,
+            download.packageName,
+            download.versionCode
+        )
+    val canExport = canInstall || isInstalled
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -64,6 +72,7 @@ fun DownloadActionsSheet(
         ) {
             DownloadHeader(
                 download = download,
+                canShowDetails = isInstalled,
                 onShowDetails = {
                     onShowDetails()
                     onDismiss()
@@ -94,10 +103,9 @@ fun DownloadActionsSheet(
                 )
             }
 
-            if (!PackageUtil.isInstalled(context, download.packageName)) {
+            if (canApplyUpdate) {
                 Item(
-                    label = stringResource(R.string.action_install),
-                    enabled = canInstall,
+                    label = stringResource(R.string.action_update),
                     onClick = {
                         onInstall()
                         onDismiss()
@@ -120,7 +128,7 @@ fun DownloadActionsSheet(
 }
 
 @Composable
-private fun DownloadHeader(download: Download, onShowDetails: () -> Unit) {
+private fun DownloadHeader(download: Download, canShowDetails: Boolean, onShowDetails: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -159,7 +167,7 @@ private fun DownloadHeader(download: Download, onShowDetails: () -> Unit) {
                 overflow = TextOverflow.Ellipsis
             )
         }
-        FilledTonalButton(onClick = onShowDetails) {
+        FilledTonalButton(onClick = onShowDetails, enabled = canShowDetails) {
             Text(stringResource(R.string.updates_app_details))
         }
     }

@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
@@ -57,25 +56,18 @@ import com.aurora.Constants
 import com.aurora.extensions.appInfo
 import com.aurora.extensions.requiresGMS
 import com.aurora.extensions.requiresObbDir
-import com.aurora.extensions.share
 import com.aurora.extensions.toast
 import com.aurora.gplayapi.data.models.App
 import com.aurora.gplayapi.data.models.Review
-import com.aurora.gplayapi.data.models.StreamBundle
-import com.aurora.gplayapi.data.models.StreamCluster
 import com.aurora.gplayapi.data.models.datasafety.Report as DataSafetyReport
 import com.aurora.store.ComposeActivity
 import com.aurora.store.R
-import com.aurora.store.compose.composable.ClusterRow
 import com.aurora.store.compose.composable.ContainedLoadingIndicator
 import com.aurora.store.compose.composable.Placeholder
 import com.aurora.store.compose.composable.ScrollHint
 import com.aurora.store.compose.composable.SectionHeader
-import com.aurora.store.compose.composable.ShimmerCarouselSection
-import com.aurora.store.compose.composable.StreamCarousel
 import com.aurora.store.compose.composable.TopAppBar
 import com.aurora.store.compose.composable.TrackerUpdateWarningDialog
-import com.aurora.store.compose.navigation.Destination
 import com.aurora.store.compose.navigation.Screen
 import com.aurora.store.compose.preview.AppPreviewProvider
 import com.aurora.store.compose.preview.ThemePreviewProvider
@@ -96,7 +88,6 @@ import com.aurora.store.compose.ui.details.composable.UserReview
 import com.aurora.store.compose.ui.details.menu.AppDetailsMenu
 import com.aurora.store.compose.ui.details.menu.MenuItem
 import com.aurora.store.compose.ui.details.navigation.ExtraScreen
-import com.aurora.store.compose.ui.dev.DevProfileScreen
 import com.aurora.store.compose.ui.sheets.AccountPickerSheet
 import com.aurora.store.compose.ui.sheets.InstallErrorSheet
 import com.aurora.store.data.installer.AppInstaller
@@ -108,7 +99,6 @@ import com.aurora.store.data.model.Scores
 import com.aurora.store.data.providers.PermissionProvider.Companion.isGranted
 import com.aurora.store.data.providers.PermissionProvider.Companion.isPermittedToInstall
 import com.aurora.store.data.room.account.Account
-import com.aurora.store.util.FlavouredUtil
 import com.aurora.store.util.PackageUtil
 import com.aurora.store.util.Preferences
 import com.aurora.store.util.Preferences.PREFERENCE_UPDATES_WARN_TRACKERS
@@ -121,9 +111,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun AppDetailsScreen(
     packageName: String,
-    onNavigateTo: (Destination) -> Unit,
-    viewModel: AppDetailsViewModel = hiltViewModel(key = packageName),
-    forceSinglePane: Boolean = false
+    viewModel: AppDetailsViewModel = hiltViewModel(key = packageName)
 ) {
     val context = LocalContext.current
 
@@ -131,12 +119,10 @@ fun AppDetailsScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val featuredReviews by viewModel.featuredReviews.collectAsStateWithLifecycle()
     val userReview by viewModel.userReview.collectAsStateWithLifecycle()
-    val favorite by viewModel.favourite.collectAsStateWithLifecycle()
     val exodusReport by viewModel.exodusReport.collectAsStateWithLifecycle()
     val dataSafetyReport by viewModel.dataSafetyReport.collectAsStateWithLifecycle()
     val plexusScores by viewModel.plexusScores.collectAsStateWithLifecycle()
     val installError by viewModel.installError.collectAsStateWithLifecycle()
-    val suggestionsBundle by viewModel.suggestionsBundle.collectAsStateWithLifecycle()
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
 
     LaunchedEffect(key1 = packageName) { viewModel.fetchAppDetails(packageName) }
@@ -184,21 +170,16 @@ fun AppDetailsScreen(
                     app = loadedApp,
                     featuredReviews = featuredReviews,
                     userReview = userReview,
-                    suggestionsBundle = suggestionsBundle,
-                    isFavorite = favorite,
                     isAnonymous = viewModel.authProvider.isAnonymous,
                     state = currentState,
                     plexusScores = plexusScores,
                     dataSafetyReport = dataSafetyReport,
                     exodusReport = exodusReport,
-                    onNavigateTo = onNavigateTo,
-                    onLoadMoreCluster = { cluster -> viewModel.loadMoreCluster(cluster) },
                     accounts = accounts,
                     onDownload = { requestedApp -> viewModel.enqueueDownload(requestedApp) },
                     onDownloadWith = { requestedApp, accountId ->
                         viewModel.enqueueDownloadWith(requestedApp, accountId)
                     },
-                    onFavorite = { viewModel.toggleFavourite(loadedApp) },
                     onCancelDownload = { viewModel.cancelDownload(loadedApp) },
                     onUninstall = { AppInstaller.uninstall(context, packageName) },
                     onOpen = {
@@ -221,7 +202,6 @@ fun AppDetailsScreen(
                         )
                     },
                     onDeleteReview = { viewModel.deleteAppReview(loadedApp) },
-                    forceSinglePane = forceSinglePane,
                     onCheckNewTrackers = { pkg, installedVc ->
                         viewModel.getNewTrackers(pkg, installedVc)
                     },
@@ -288,7 +268,7 @@ private fun ScreenContentError(message: String? = null, onRetry: (() -> Unit)? =
 }
 
 /**
- * Composable to display app details and suggestions
+ * Composable to display details for an installed app.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -296,19 +276,14 @@ private fun ScreenContentApp(
     app: App,
     featuredReviews: List<Review> = emptyList(),
     userReview: Review? = null,
-    suggestionsBundle: StreamBundle? = StreamBundle.EMPTY,
-    isFavorite: Boolean = false,
     isAnonymous: Boolean = true,
     state: AppState = AppState.Unavailable,
     plexusScores: Scores? = null,
     dataSafetyReport: DataSafetyReport? = null,
     exodusReport: Report? = null,
-    onNavigateTo: (Destination) -> Unit = {},
-    onLoadMoreCluster: (cluster: StreamCluster) -> Unit = {},
     accounts: List<Account> = emptyList(),
     onDownload: (requestedApp: App) -> Unit = {},
     onDownloadWith: (requestedApp: App, accountId: String) -> Unit = { _, _ -> },
-    onFavorite: () -> Unit = {},
     onCancelDownload: () -> Unit = {},
     onUninstall: () -> Unit = {},
     onOpen: () -> Unit = {},
@@ -316,7 +291,6 @@ private fun ScreenContentApp(
     onSubmitReview: (rating: Int, title: String, comment: String) -> Unit = { _, _, _ -> },
     onDeleteReview: () -> Unit = {},
     windowAdaptiveInfo: WindowAdaptiveInfo = currentWindowAdaptiveInfoV2(),
-    forceSinglePane: Boolean = false,
     onCheckNewTrackers: suspend (
         packageName: String,
         installedVersionCode: Long
@@ -326,15 +300,9 @@ private fun ScreenContentApp(
 ) {
     val context = LocalContext.current
 
-    // Anonymous accounts can't purchase, so a paid app can neither be installed nor manually
-    // downloaded (any version) by them. Free apps are always acquirable.
-    val canAcquire = app.isFree || !isAnonymous
-
-    var scaffoldDirective = calculatePaneScaffoldDirective(windowAdaptiveInfo)
-
-    if (forceSinglePane) {
-        scaffoldDirective = scaffoldDirective.copy(maxHorizontalPartitions = 1)
-    }
+    // This build never presents the catalogue/suggestion supporting pane.
+    val scaffoldDirective = calculatePaneScaffoldDirective(windowAdaptiveInfo)
+        .copy(maxHorizontalPartitions = 1)
 
     val scaffoldNavigator = rememberSupportingPaneScaffoldNavigator<NavKey>(
         scaffoldDirective = scaffoldDirective,
@@ -376,26 +344,14 @@ private fun ScreenContentApp(
         }
     }
 
-    fun onInstall(
-        requestedApp: App = app,
-        ignoreMicroG: Boolean = false,
-        accountId: String? = null
-    ) {
+    fun onInstall(requestedApp: App = app, accountId: String? = null) {
         if (isPermittedToInstall(context, app)) {
-            val shouldPromptMicroGInstall = app.requiresGMS() &&
-                FlavouredUtil.promptMicroGInstall(context)
-
-            if (shouldPromptMicroGInstall && !ignoreMicroG) {
-                isChecking = false
-                showExtraPane(ExtraScreen.MicroG)
+            if (accountId != null) {
+                onDownloadWith(requestedApp, accountId)
             } else {
-                if (accountId != null) {
-                    onDownloadWith(requestedApp, accountId)
-                } else {
-                    onDownload(requestedApp)
-                }
-                onNavigateBack()
+                onDownload(requestedApp)
             }
+            onNavigateBack()
         } else {
             isChecking = false
             val requiredPermissions = setOfNotNull(
@@ -459,31 +415,17 @@ private fun ScreenContentApp(
     @Composable
     fun SetupMenu() {
         AppDetailsMenu(
-            isFavorite = isFavorite,
             state = state,
-            canManualDownload = canAcquire,
             canUseOtherAccount = accounts.size > 1
         ) { menuItem ->
             when (menuItem) {
-                MenuItem.FAVORITE -> onFavorite()
-
-                MenuItem.MANUAL_DOWNLOAD -> {
-                    showExtraPane(ExtraScreen.ManualDownload)
-                }
-
                 MenuItem.INSTALL_OTHER_ACCOUNT -> {
                     showAccountPicker = true
                 }
-
-                MenuItem.SHARE -> context.share(app.displayName, app.packageName)
-
                 MenuItem.APP_INFO -> context.appInfo(app.packageName)
-
                 MenuItem.ADD_TO_HOME -> {
                     ShortcutManagerUtil.requestPinShortcut(context, app.packageName)
                 }
-
-                MenuItem.PLAY_STORE -> openPlayStore(context, app.packageName)
             }
         }
     }
@@ -549,24 +491,7 @@ private fun ScreenContentApp(
                     )
                 }
 
-                else -> {
-                    val primaryActionName = if (currentState is AppState.Archived) {
-                        stringResource(R.string.action_unarchive)
-                    } else {
-                        if (app.isFree) stringResource(R.string.action_install) else app.price
-                    }
-
-                    Actions(
-                        primaryActionDisplayName = primaryActionName,
-                        secondaryActionDisplayName = stringResource(
-                            R.string.title_manual_download
-                        ),
-                        isPrimaryActionEnabled = canAcquire,
-                        isSecondaryActionEnabled = canAcquire,
-                        onPrimaryAction = ::onInstall,
-                        onSecondaryAction = { showExtraPane(ExtraScreen.ManualDownload) }
-                    )
-                }
+                else -> Unit
             }
         }
     }
@@ -595,11 +520,7 @@ private fun ScreenContentApp(
                     state = listState
                 ) {
                     item {
-                        Details(
-                            app = app,
-                            state = state,
-                            onNavigateToDetailsDevProfile = { showExtraPane(Screen.DevProfile(it)) }
-                        )
+                        Details(app = app, state = state)
                     }
 
                     item {
@@ -706,14 +627,6 @@ private fun ScreenContentApp(
                             email = app.developerEmail
                         )
                     }
-
-                    if (shouldShowMenuOnMainPane) {
-                        suggestionClusterItems(
-                            suggestionsBundle = suggestionsBundle,
-                            onAppClick = { onNavigateTo(Destination.AppDetails(it.packageName)) },
-                            onClusterScrolled = onLoadMoreCluster
-                        )
-                    }
                 }
                 ScrollHint(
                     listState = listState,
@@ -733,17 +646,7 @@ private fun ScreenContentApp(
                 )
             }
         ) { paddingValues ->
-            val hasContent = suggestionsBundle == null ||
-                suggestionsBundle.streamClusters.isNotEmpty()
-            if (hasContent) {
-                StreamCarousel(
-                    modifier = Modifier.padding(paddingValues),
-                    streamBundle = suggestionsBundle,
-                    filterSingleAppClusters = false,
-                    onAppClick = { onNavigateTo(Destination.AppDetails(it.packageName)) },
-                    onClusterScrolled = onLoadMoreCluster
-                )
-            }
+            Box(modifier = Modifier.padding(paddingValues))
         }
     }
 
@@ -758,8 +661,7 @@ private fun ScreenContentApp(
         )
 
         is ExtraScreen.More -> MoreScreen(
-            packageName = app.packageName,
-            onNavigateTo = onNavigateTo
+            packageName = app.packageName
         )
 
         is ExtraScreen.Permission -> PermissionScreen(
@@ -771,20 +673,8 @@ private fun ScreenContentApp(
             index = screen.index
         )
 
-        is ExtraScreen.ManualDownload -> ManualDownloadScreen(
-            packageName = app.packageName,
-            onRequestInstall = { requestedApp -> onInstall(requestedApp) }
-        )
-
-        is ExtraScreen.MicroG -> MicroGScreen(
-            packageName = app.packageName,
-            onProceed = { onInstall(ignoreMicroG = true) }
-        )
-
-        is Screen.DevProfile -> DevProfileScreen(
-            publisherId = app.developerName,
-            onNavigateTo = onNavigateTo
-        )
+        ExtraScreen.ManualDownload,
+        ExtraScreen.MicroG -> Unit
 
         is Screen.PermissionRationale -> PermissionRationaleScreen(
             requiredPermissions = screen.requiredPermissions,
@@ -814,60 +704,13 @@ private fun ScreenContentApp(
     )
 }
 
-/**
- * Renders the suggestion stream as cluster rows inside the parent [LazyColumn].
- * Shows a shimmer placeholder while the bundle is still loading (`null`).
- */
-private fun LazyListScope.suggestionClusterItems(
-    suggestionsBundle: StreamBundle?,
-    onAppClick: (App) -> Unit,
-    onClusterScrolled: (StreamCluster) -> Unit
-) {
-    if (suggestionsBundle == null) {
-        item(key = "suggestions-shimmer") { ShimmerCarouselSection() }
-        return
-    }
-
-    val clusters = suggestionsBundle.streamClusters.values.filter {
-        it.clusterTitle.isNotBlank() && it.clusterAppList.isNotEmpty()
-    }
-
-    clusters.forEach { cluster ->
-        item(key = "cluster-header-${cluster.id}") {
-            SectionHeader(title = cluster.clusterTitle)
-        }
-        item(key = "cluster-row-${cluster.id}") {
-            ClusterRow(
-                cluster = cluster,
-                onAppClick = onAppClick,
-                onClusterScrolled = onClusterScrolled
-            )
-        }
-    }
-}
-
 @PreviewWrapper(ThemePreviewProvider::class)
 @PreviewScreenSizes
 @Composable
 private fun AppDetailsScreenPreview(@PreviewParameter(AppPreviewProvider::class) app: App) {
     ScreenContentApp(
         app = app,
-        isAnonymous = false,
-        suggestionsBundle = StreamBundle(
-            id = 1,
-            streamClusters = mapOf(
-                1 to StreamCluster(
-                    id = 1,
-                    clusterTitle = "Similar apps",
-                    clusterAppList = List(8) { app.copy(id = it) }
-                ),
-                2 to StreamCluster(
-                    id = 2,
-                    clusterTitle = "More by ${app.developerName}",
-                    clusterAppList = List(5) { app.copy(id = 100 + it) }
-                )
-            )
-        )
+        isAnonymous = false
     )
 }
 

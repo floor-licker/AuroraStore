@@ -74,7 +74,6 @@ import com.aurora.store.compose.composable.Placeholder
 import com.aurora.store.compose.composable.ScrollHint
 import com.aurora.store.compose.composable.SearchSuggestionListItem
 import com.aurora.store.compose.composable.app.LargeAppListItem
-import com.aurora.store.compose.navigation.Destination
 import com.aurora.store.compose.preview.AppPreviewProvider
 import com.aurora.store.compose.preview.ThemePreviewProvider
 import com.aurora.store.compose.ui.details.AppDetailsScreen
@@ -279,15 +278,7 @@ private fun ScreenContent(
         with(scaffoldNavigator.currentDestination?.contentKey) {
             when {
                 this != null -> {
-                    AppDetailsScreen(
-                        packageName = this,
-                        onNavigateTo = { destination ->
-                            if (destination is Destination.AppDetails) {
-                                showDetailPane(destination.packageName)
-                            }
-                        },
-                        forceSinglePane = true
-                    )
+                    AppDetailsScreen(packageName = this)
                 }
 
                 else -> {

@@ -95,42 +95,7 @@
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
             <intent-filter>
-                <action android:name="android.intent.action.SEND" />
-
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="text/plain" />
-            </intent-filter>
-            <intent-filter>
                 <action android:name="android.intent.action.SHOW_APP_INFO" />
-            </intent-filter>
-        </activity>
-
-        <!-- Confirmation gate for external app-listing deep links (market:// & play.google.com) -->
-        <activity
-            android:name=".DeepLinkConfirmActivity"
-            android:excludeFromRecents="true"
-            android:exported="true"
-            android:launchMode="singleTop"
-            android:taskAffinity=""
-            android:theme="@style/AppTheme.Translucent.Transparent">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-
-                <data android:scheme="market" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-
-                <data android:scheme="http" />
-                <data android:scheme="https" />
-                <data android:host="market.android.com" />
-                <data android:host="play.google.com" />
             </intent-filter>
         </activity>
 
@@ -224,13 +189,5 @@
             </intent-filter>
         </receiver>
 
-        <!-- Android15+ package unarchive feature -->
-        <receiver
-            android:name=".data.receiver.UnarchivePackageReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.intent.action.UNARCHIVE_PACKAGE" />
-            </intent-filter>
-        </receiver>
     </application>
 </manifest>
